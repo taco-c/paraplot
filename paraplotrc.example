@@ -1,0 +1,36 @@
+#!/bin/bash
+
+#
+# Paraplot settings
+#
+
+# Directory where all logs will be saved. Subdirectories will be made
+LOG_ROOT="$XDG_DATA_HOME/paraplot/logs"
+
+# Phase to start new plot after.
+PHASE_N="1"
+
+# After PHASE_N is done, wait this amount of time to start next. 
+# Can be anything the sleep command supports, eg. "1h 30m 15s".
+DELAY="0"
+
+# Command which will be run at events.
+# The event text will be sent as parameter at the end of this command.
+# Ex. "notify-send"
+NOTIFY_CMD=""
+
+
+#
+# Chia settings
+#
+
+THREADS="2"
+MEMORY="4096"
+K_SIZE="32"
+TEMP_DIR="$HOME/plotssd/plots"
+DEST_DIR="$HOME/farm01/plots_nft"
+POOL_ADDR="<your pool address>"
+
+# Arbitrary parameters passed directly to "chia plots create".
+CHIA_PARAMS=""
+

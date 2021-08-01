@@ -1,0 +1,109 @@
+#!/bin/bash
+
+#
+# Adaptive parallel plot wrapper for Chia: paraplot
+#
+# Starts plotting another plot in parallel
+# when the current plot finishes phase PHASE_N.
+#
+
+[ "$1" = "" ] && echo "Needs a number of plots to create" && exit
+
+print_error() { echo -e "[ERROR] $@"; }
+print_info() { echo -e "[INFO] $@"; }
+print_exit() { echo -e "$@" && exit; }
+
+notify() {
+	echo -e "$1"
+	[ -n "$NOTIFY_CMD" ] && $NOTIFY_CMD "\`\`\`\n$1\n\`\`\`"
+}
+
+CONFIG_FILE=$HOME/.config/paraplotrc
+[ -x "$CONFIG_FILE" ] \
+	&& . "$CONFIG_FILE" \
+	|| print_exit "Config file not found or not executable."
+
+# Paraplot internal settings
+SESSION=`date "+%Y%m%d_%H%M"`
+
+[ -z "$LOG_ROOT" ] \
+	&& [ ! -z $XDG_DATA_HOME ] \
+		LOG_ROOT="$XDG_DATA_HOME/paraplot/logs" \
+	|| LOG_ROOT="$HOME/.local/share/paraplot/logs"
+
+LOG_DIR="$LOG_ROOT/session_$SESSION"
+[ ! -d "$LOG_DIR" ] && mkdir -p "$LOG_DIR"
+
+# Chia defaults
+[ -z "$K_SIZE" ]    && K_SIZE=32
+[ -z "$THREADS" ]   && THREADS=2
+[ -z "$MEMORY" ]    && MEMORY=4608
+[ -z "$TEMP_DIR" ]  && print_error "no TEMP_DIR defined" && error=1
+[ -z "$DEST_DIR" ]  && print_error "no DEST_DIR defined" && error=1
+[ -z "$POOL_ADDR" ] && print_info "no POOL_ADDR defined"
+
+# Plot for pool only if POOL_ADDR is set.
+[ -n "$POOL_ADDR" ] && POOLING="-c $POOL_ADDR" || print_info "no POOL_ADDR defined"
+
+# Paraplot defaults
+[ -z "$PHASE_N" ]        && PHASE_N=1 # Phase to start new plot at
+[ -z "$DELAY" ]          && DELAY=0
+[ -z "$MAX_CONCURRENT" ] && MAX_CONCURRENT=0
+
+[ "$error" = 1 ] && exit
+
+# Monitors a file and returns the line it's waiting for then exits.
+monphn() {
+	while read line; do
+		message=`tail $1 | grep "Time for phase $2"`
+		[ "$message" = "" ] && continue
+		echo $message
+		return
+	done < <(inotifywait -mq -e MODIFY $file)
+}
+
+create_plot() {
+	notify "🔥 $PLOT_NAME / $n"
+	chia plots create -n 1 \
+		-k "$K_SIZE" \
+		-r "$THREADS" \
+		-t "$TEMP_DIR" \
+		-d "$DEST_DIR" \
+		$POOLING \
+		$CHIA_PARAMS \
+		&& notify "🚜 $1 / $n"
+}
+
+plot() {
+	i="$1"
+	n="$2"
+	[ "$i" -gt "$n" ] && exit
+
+	LOG_FILE="$LOG_DIR/plot_`date "+%Y%m%d_%H%M"`_$i.log"
+	PLOT_NAME="${SESSION}_$i"
+
+	create_plot "$PLOT_NAME" > "$LOG_FILE" &
+	
+	while read line; do
+		sleep $DELAY
+		i=`expr $i + 1`
+		plot $i $n
+	done < <(monphn "$LOG_FILE" "$PHASE_N")
+}
+
+# Starting first plot
+SETTINGS="\`\`\`\nSession: $SESSION\nLOG_ROOT: $LOG_ROOT\nPlots: $1\nT: $TEMP_DIR\nD: $DEST_DIR\nTHREADS: $THREADS\nMEMORY: $MEMORY\nK_SIZE: $K_SIZE\nPHASE_N: $PHASE_N\nDELAY: $DELAY\nNOTIFY: $NOTIFY_CMD\nCHIA_PARAMS: $CHIA_PARAMS\n\`\`\`"
+
+notify "$SETTINGS"
+
+while true; do
+	[ "$YES" = 1 ] && break
+	read -p "Continue creating plot with current settings? [Y/n] " yn
+	case $yn in
+		[Nn]* ) exit;;
+		* ) break;;
+	esac
+done
+
+plot 1 "$1"
+
