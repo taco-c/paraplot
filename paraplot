@@ -15,7 +15,7 @@ print_exit() { echo -e "$@" && exit; }
 
 notify() {
 	echo -e "$1"
-	[ -n "$NOTIFY_CMD" ] && $NOTIFY_CMD "\`\`\`\n$1\n\`\`\`"
+	[ -n "$NOTIFY_CMD" ] && $NOTIFY_CMD "$1"
 }
 
 CONFIG_FILE=$HOME/.config/paraplotrc
