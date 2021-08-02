@@ -55,11 +55,11 @@ LOG_DIR="$LOG_ROOT/session_$SESSION"
 # Monitors a file and returns the line it's waiting for then exits.
 monphn() {
 	while read line; do
-		message=`tail $1 | grep "Time for phase $2"`
+		message=`tail "$1" | grep "Time for phase $2"`
 		[ "$message" = "" ] && continue
 		echo $message
 		return
-	done < <(inotifywait -mq -e MODIFY $file)
+	done < <(inotifywait -mq -e MODIFY "$1")
 }
 
 create_plot() {
